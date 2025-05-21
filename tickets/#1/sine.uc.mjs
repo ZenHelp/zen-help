@@ -1479,6 +1479,7 @@ const Sine = {
 
         // Fetch and store all items
         if (UC_API.Prefs.get("sine.no-internet")["value"]) {
+            console.log("No internet is crazy!");
             const latest = await this.fetch(this.storeURL).catch(err => console.warn(err));
             if (latest) {
                 this.modGitHubs = latest.marketplace;
@@ -1487,7 +1488,10 @@ const Sine = {
             }
         }
 
+        console.log("Almost there?");
+
         if (this.modGitHubs) {
+            console.log("Yes, modGitHubs is here!");
             const keys = Object.keys(this.modGitHubs);
             this.allItems = [];
             for (const key of keys) {
@@ -1497,7 +1501,9 @@ const Sine = {
                 }
             }
             this.filteredItems = [...this.allItems];
+            console.log("About to load marketplace page!");
             await this.loadPage(newList, navContainer);
+            console.log("Loaded marketplace page!");
         }
 
         // Append custom mods description
@@ -1638,9 +1644,13 @@ const Sine = {
 
     async init() {
         this.applySiteStyles();
+        console.log("Styles applied.");
         await this.initMarketplace();
+        console.log("Marketplace initiated.");
         await this.loadMods();
+        console.log("mods loaded!");
         await this.updateMods("auto");
+        console.log("mods updated!");
         this.manager._doNotRebuildThemesList = true;
     },
 }
