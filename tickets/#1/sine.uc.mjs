@@ -1668,6 +1668,7 @@ switch (document.location.pathname) {
         await Sine.checkForUpdates();
         const fetchFunc = async () => {
             const url = UC_API.Prefs.get("sine.fetch-url")["value"];
+            console.log(url);
             let response = await fetch(url).then(res => res.text()).catch(err => console.warn(err));
             await UC_API.SharedStorage.widgetCallbacks.set("fetch-results", response);
             UC_API.Prefs.removeListener(fetchListener);
