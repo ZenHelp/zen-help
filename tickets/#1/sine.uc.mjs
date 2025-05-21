@@ -664,6 +664,7 @@ const Sine = {
                 && theme[property].startsWith("https://raw.githubusercontent.com/zen-browser/theme-store"));
 
         const repoRoot = this.rawURL(repo);
+        console.log("CREATE DATA: ", translateToAPI(repo), repo, UC_API.Prefs.get("sine.no-internet"));
         const githubAPI = await localFetch(translateToAPI(repo));
 
         const setProperty = async (property, value, ifValue=true, nestedProperty=false, escapeNull=false) => {
