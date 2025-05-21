@@ -82,6 +82,7 @@ const Sine = {
         const latest = await fetch(this.storeURL).then(res => res.json()).catch(err => console.warn(err));
         if (latest) {
             this.modGitHubs = latest.marketplace;
+            console.log(latest, latest.marketplace);
             if (UC_API.Prefs.get("sine.script.auto-update")["value"] && new Date(latest.updatedAt) > new Date(this.updatedAt)) {
                 await this.updateScript();
                 if (UC_API.Prefs.get("sine.script.auto-restart")["value"])
@@ -750,7 +751,9 @@ const Sine = {
     async checkForUpdates() {
         if (this.autoUpdates) {
             const currThemeData = await this.utils.getThemes();
+            console.log("Auto-updates enabled!");
             for (const key in currThemeData) {
+                console.log("Something detected!");
                 const currModData = currThemeData[key];
                 let newThemeData;
                 if (currModData.hasOwnProperty("homepage") && currModData["homepage"]) {
@@ -1648,14 +1651,18 @@ switch (document.location.pathname) {
             if (document.readyState === "complete") {
                 document.querySelector("#category-zen-marketplace .category-name").textContent = "Sine";
                 const listenerFunc = async () => {
-                    if (!UC_API.Prefs.get("sine.no-internet")["value"])
+                    console.log("In listener function!");
+                    if (!UC_API.Prefs.get("sine.no-internet")["value"]) {
                         Sine.modGitHubs = JSON.parse(await UC_API.SharedStorage.widgetCallbacks.get("transfer"));
+                        console.log(Sine.modGitHubs, "internet activated!");
+                    }
                     Sine.init();
                 }
 
                 if (!UC_API.Prefs.get("sine.transfer-complete")["value"]) {
                     const listener = UC_API.Prefs.addListener("sine.transfer-complete", () => {
                         UC_API.Prefs.removeListener(listener);
+                        console.log("Transfer complete!");
                         listenerFunc();
                     });
                 } else listenerFunc();
