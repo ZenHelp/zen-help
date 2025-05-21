@@ -1234,6 +1234,7 @@ const Sine = {
 
         // Render items for the current page
         for (const { key, data } of currentItems) {
+            console.log(key, data);
             // Create item
             const newItem = document.createElement("vbox");
             newItem.className = "sineInstallationItem";
