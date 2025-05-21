@@ -802,7 +802,7 @@ const Sine = {
                 } else
                     newThemeData = await this.fetch(`https://raw.githubusercontent.com/zen-browser/theme-store/main/themes/${this.rawURL(currModData["id"])}/theme.json`);
                 
-                if (newThemeData && newThemeData.toLowerCase() !== "404: not found" && currModData["enabled"] && !currModData["no-updates"] && new Date(currModData["updatedAt"]) < new Date(newThemeData["updatedAt"])) {
+                if (newThemeData && typeof newThemeData === "object" && currModData["enabled"] && !currModData["no-updates"] && new Date(currModData["updatedAt"]) < new Date(newThemeData["updatedAt"])) {
                     changeMade = true;
                     const themeFolder = this.utils.getThemeFolder(newThemeData["id"]);
                     console.log("Auto-updating: " + currModData["name"] + "!");
