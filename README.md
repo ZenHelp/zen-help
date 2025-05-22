@@ -41,7 +41,7 @@ Mods are cool, but themes are cooler - especially if they are _yours_, this is a
   Note: If you are unable to open the browser console check if the config, `devtools.chrome.enabled` is true
 
 * **Learning The ropes**\
-  After setup you are free to start theming, if you do not know CSS we reccomend using a tool like ChatGPT to learn basic syntax as it is not vary hard. If you have no interest in learing this, or do not have the time, please consider making a Mod Request. Your ideas are valued and we love community projects.
+  After setup you are free to start theming, if you do not know CSS we reccomend using a tool like ChatGPT to learn basic syntax as it is not vary hard. If you have no interest in learning this, or do not have the time, please consider making a Mod Request. Your ideas are valued and we love community projects.
   1. Organization
      Themes are usually organized with the following structure:
      ```
