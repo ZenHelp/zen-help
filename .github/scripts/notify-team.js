@@ -54,7 +54,7 @@ const { Octokit } = require('@octokit/rest');
 
     // If no specific teams are mapped, notify a default team
     if (teamsToNotify.size === 0) {
-      teamsToNotify.add('dev-team'); // Default team
+      teamsToNotify.add('triage-team'); // Default team
     }
 
     // Notify teams by adding a comment
