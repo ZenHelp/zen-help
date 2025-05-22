@@ -41,7 +41,7 @@ const { Octokit } = require('@octokit/rest');
     const labelToTeam = {
       'bug': ['backend-team', 'qa-team'],
       'feature': ['frontend-team', 'product-team'],
-      'enhancement': ['dev-team'],
+      'enhancement': ['zen-mods'],
       // Add more mappings as needed
     };
 
