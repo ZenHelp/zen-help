@@ -11,7 +11,7 @@ const { Octokit } = require('@octokit/rest');
     let labels = [];
     let commentBody = '';
 
-    // Fetch labels and determine teams to notify
+    // Fetch labels
     if (eventType === 'issues') {
       const { data } = await octokit.issues.get({
         owner,
@@ -19,7 +19,7 @@ const { Octokit } = require('@octokit/rest');
         issue_number: number,
       });
       labels = data.labels.map(label => label.name);
-      commentBody = `New issue #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/ZenHelp/zen-help/tree/main/tickets/%23${number}/evaluation.md) file.`;
+      commentBody = `New issue #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/${owner}/${repo}/tree/main/tickets/%23${number}/evaluation.md) file.`;
     } else if (eventType === 'discussion') {
       const { data } = await octokit.graphql(`
         query($owner: String!, $repo: String!, $number: Int!) {
@@ -34,14 +34,24 @@ const { Octokit } = require('@octokit/rest');
           }
         }`, { owner, repo, number: parseInt(number) });
       labels = data.repository.discussion.labels.nodes.map(label => label.name);
-      commentBody = `New discussion #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/ZenHelp/zen-help/tree/main/tickets/%23${number}/evaluation.md) file.`;
+      commentBody = `New discussion #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/${owner}/${repo}/tree/main/tickets/%23${number}/evaluation.md) file.`;
     }
 
-    // Map labels to teams (customize this mapping as needed)
+    // Map labels to teams (customize as needed)
     const labelToTeam = {
-      'bug': ['backend-team', 'qa-team'],
-      'feature': ['frontend-team', 'product-team'],
-      'enhancement': ['zen-mods'],
+      'general': [''],
+      'transparency': [''],
+      'bug': [''],
+      'theming': ['zen-themes'],
+      'userChrome': [''],
+      'userContent': [''],
+      'mods': ['zen-mods'],
+      'requests': ['mod-creation'],
+      'assistance': ['mod-creation'],
+      'Sine': ['sine'],
+      'Silkthemes': ['silkthemes'],
+      'Zen': ['zen'],
+      'needs-triage': ['triage-team'],
       // Add more mappings as needed
     };
 
@@ -52,37 +62,42 @@ const { Octokit } = require('@octokit/rest');
       }
     });
 
-    // If no specific teams are mapped, notify a default team
+    // If no teams are mapped, notify a default team
     if (teamsToNotify.size === 0) {
-      teamsToNotify.add('triage-team'); // Default team
+      teamsToNotify.add('triage-team');
     }
 
-    // Notify teams by adding a comment
+    // Create comment with team mentions
     const mentions = Array.from(teamsToNotify).map(team => `@${owner}/${team}`).join(' ');
-    const finalComment = `${mentions}. ${commentBody}`;
+    const finalComment = `${mentions} ${commentBody}`;
 
-    if (eventType === 'issues') {
-      await octokit.issues.createComment({
-        owner,
-        repo,
-        issue_number: number,
-        body: finalComment,
-      });
-    } else if (eventType === 'discussion') {
-      await octokit.graphql(`
-        mutation($discussionId: ID!, $body: String!) {
-          addDiscussionComment(input: { discussionId: $discussionId, body: $body }) {
-            comment {
-              id
+    try {
+      if (eventType === 'issues') {
+        await octokit.issues.createComment({
+          owner,
+          repo,
+          issue_number: number,
+          body: finalComment,
+        });
+      } else if (eventType === 'discussion') {
+        const discussionId = await getDiscussionId(octokit, owner, repo, number);
+        await octokit.graphql(`
+          mutation($discussionId: ID!, $body: String!) {
+            addDiscussionComment(input: { discussionId: $discussionId, body: $body }) {
+              comment {
+                id
+              }
             }
-          }
-        }`, {
-        discussionId: await getDiscussionId(octokit, owner, repo, number),
-        body: finalComment,
-      });
+          }`, {
+          discussionId,
+          body: finalComment,
+        });
+      }
+      console.log(`Notified teams: ${Array.from(teamsToNotify).join(', ')}`);
+    } catch (commentError) {
+      console.error(`Failed to create comment: ${commentError.message}`);
+      console.error('This may be due to insufficient permissions for GITHUB_TOKEN. Ensure the workflow has "issues: write" and "discussions: write" permissions.');
     }
-
-    console.log(`Notified teams: ${Array.from(teamsToNotify).join(', ')}`);
   } catch (error) {
     console.error('Error:', error);
     process.exit(1);
@@ -91,13 +106,18 @@ const { Octokit } = require('@octokit/rest');
 
 // Helper function to get discussion ID
 async function getDiscussionId(octokit, owner, repo, number) {
-  const { data } = await octokit.graphql(`
-    query($owner: String!, $repo: String!, $number: Int!) {
-      repository(owner: $owner, name: $repo) {
-        discussion(number: $number) {
-          id
+  try {
+    const { data } = await octokit.graphql(`
+      query($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          discussion(number: $number) {
+            id
+          }
         }
-      }
-    }`, { owner, repo, number: parseInt(number) });
-  return data.repository.discussion.id;
+      }`, { owner, repo, number: parseInt(number) });
+    return data.repository.discussion.id;
+  } catch (error) {
+    console.error(`Failed to fetch discussion ID: ${error.message}`);
+    throw error;
+  }
 }
