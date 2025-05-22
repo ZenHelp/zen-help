@@ -59,9 +59,9 @@ const path = require('path');
     const content = `
 ### ${title}
 
-**Labels**: ${labels}
-**Author**: ${author}
-**Link**: ${html_url}
+**Labels**: ${labels}\
+**Author**: ${author}\
+**Link**: ${html_url}\
     `;
 
     // Write evaluation.md file
