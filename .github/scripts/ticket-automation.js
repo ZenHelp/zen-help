@@ -25,23 +25,29 @@ const path = require('path');
   ]);
 
   const folderName = `#${number}`;
+  const ticketFolder = path.join(ticketsDir, folderName);
+  const referenceFolder = path.join(referenceDir, folderName);
+  const historyFolder = path.join(historyDir, folderName);
 
-  async function moveFolder(src, dest) {
+  async function moveFile(src, destDir) {
     try {
       await fs.access(src);
+      await fs.mkdir(destDir, { recursive: true });
+      const dest = path.join(destDir, 'evaluation.md');
       await fs.rename(src, dest);
-      console.log(`Moved folder from ${src} to ${dest}`);
+      console.log(`Moved evaluation.md from ${src} to ${dest}`);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        console.log(`Source folder ${src} not found, skipping move.`);
+        console.log(`Source file ${src} not found, skipping move.`);
       } else {
         throw error;
       }
     }
   }
 
-  async function updateEvaluationFile(number, details) {
-    const folderPath = path.join(ticketsDir, `#${number}`);
+  async function updateEvaluationFile(number, details, targetDir = ticketsDir) {
+    const folderPath = path.join(targetDir, `#${number}`);
+    await fs.mkdir(folderPath, { recursive: true });
     const content = `
 ### ${details.title}
 
@@ -49,9 +55,8 @@ const path = require('path');
 **Author**: [@${details.author}](https://github.com/${details.author})\\
 **Link**: ${details.html_url}\\
     `;
-    await fs.mkdir(folderPath, { recursive: true });
     await fs.writeFile(path.join(folderPath, 'evaluation.md'), content.trim());
-    console.log(`Updated evaluation.md for issue #${number}`);
+    console.log(`Updated evaluation.md for #${number} in ${targetDir}`);
   }
 
   try {
@@ -78,31 +83,60 @@ const path = require('path');
           data = updatedData.data;
           details.labels = data.labels.map(label => label.name).join(', ') || 'None';
         }
-        const folderPath = path.join(ticketsDir, `#${number}`);
-        await fs.rm(folderPath, { recursive: true, force: true });
+        await fs.rm(ticketFolder, { recursive: true, force: true });
         await updateEvaluationFile(number, details);
       } else if (eventAction === 'edited' || eventAction === 'labeled' || eventAction === 'unlabeled') {
         details.labels = data.labels.map(label => label.name).join(', ') || 'None';
-        await updateEvaluationFile(number, details);
+        // Only update if the folder exists in tickets/
+        if (await fs.access(path.join(ticketFolder, 'evaluation.md')).then(() => true).catch(() => false)) {
+          await updateEvaluationFile(number, details);
+        }
       } else if (eventAction === 'closed') {
         const labels = data.labels.map(label => label.name);
-        const targetDir = labels.includes(REFERENCE_LABEL) ? referenceDir : historyDir;
-        const src = path.join(ticketsDir, folderName);
-        const dest = path.join(targetDir, folderName);
-        await moveFolder(src, dest);
+        const targetDir = labels.includes(REFERENCE_LABEL) ? referenceFolder : historyFolder;
+        const src = path.join(ticketFolder, 'evaluation.md');
+        await moveFile(src, targetDir);
+        await fs.rm(ticketFolder, { recursive: true, force: true });
       } else if (eventAction === 'reopened') {
-        const possibleSrc1 = path.join(referenceDir, folderName);
-        const possibleSrc2 = path.join(historyDir, folderName);
-        const dest = path.join(ticketsDir, folderName);
+        const possibleSrc1 = path.join(referenceFolder, 'evaluation.md');
+        const possibleSrc2 = path.join(historyFolder, 'evaluation.md');
         if (await fs.access(possibleSrc1).then(() => true).catch(() => false)) {
-          await moveFolder(possibleSrc1, dest);
+          await moveFile(possibleSrc1, ticketFolder);
+          await fs.rm(referenceFolder, { recursive: true, force: true });
         } else if (await fs.access(possibleSrc2).then(() => true).catch(() => false)) {
-          await moveFolder(possibleSrc2, dest);
+          await moveFile(possibleSrc2, ticketFolder);
+          await fs.rm(historyFolder, { recursive: true, force: true });
         } else {
-          console.log(`No resolved folder found for #${number}, creating new ticket folder`);
+          console.log(`No resolved evaluation.md found for #${number}, creating new ticket folder`);
           await updateEvaluationFile(number, details);
         }
       }
+    } else if (eventType === 'discussion' && eventAction === 'created') {
+      const { data } = await octokit.graphql(`
+        query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            discussion(number: $number) {
+              title
+              author {
+                login
+              }
+              url
+              labels(first: 100) {
+                nodes {
+                  name
+                }
+              }
+            }
+          }
+        }`, { owner, repo, number: parseInt(number) });
+      const details = {
+        title: data.repository.discussion.title,
+        labels: data.repository.discussion.labels.nodes.map(label => label.name).join(', ') || 'None',
+        author: data.repository.discussion.author.login,
+        html_url: data.repository.discussion.url
+      };
+      await fs.rm(ticketFolder, { recursive: true, force: true });
+      await updateEvaluationFile(number, details);
     }
   } catch (error) {
     console.error('Error:', error);
