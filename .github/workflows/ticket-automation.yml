@@ -1,59 +1,53 @@
 name: Ticket Automation Bot
-
 on:
   issues:
-    types: [opened]
+    types: [opened, closed, reopened]
   discussion:
     types: [created]
-
 jobs:
-  create-ticket-folder:
+  manage-ticket-folder:
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
       discussions: write
-      pull-requests: write
-      repository-projects: read
-
     steps:
-      # Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v4
-
-      # Set up Node.js to run the script
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      # Install dependencies (if needed)
       - name: Install Dependencies
         run: npm install @octokit/rest
-
-      # Run the Node.js script
-      - name: Create Ticket Folder and File
+      - name: Manage Ticket Folder
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           EVENT_TYPE: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.discussion.number }}
         run: node .github/scripts/ticket-automation.js
-
-      # Commit and push changes
       - name: Commit Changes
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add tickets/
-          git commit -m "Create ticket folder and evaluation.md for #${{ github.event.issue.number || github.event.discussion.number }}"
+          if [ "${{ github.event_name }}" == "issues" ]; then
+            if [ "${{ github.event.action }}" == "closed" ]; then
+              git commit -m "Delete ticket folder for closed issue #${{ github.event.issue.number }}"
+            else
+              git commit -m "Create ticket folder and evaluation.md for issue #${{ github.event.issue.number }}"
+            fi
+          elif [ "${{ github.event_name }}" == "discussion" ]; then
+            git commit -m ":KOKCreate ticket folder and evaluation.md for discussion #${{ github.event.discussion.number }}"
+          fi
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Notify team members
       - name: Notify Team
+        if: github.event.action == 'opened' || github.event.action == 'created'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_OWNER: ${{ github.repository_owner }}
