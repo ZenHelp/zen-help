@@ -98,4 +98,4 @@ Mods are cool, but themes are cooler - especially if they are _yours_, this is a
      * silkthemes (currently unfinished, not ticket yet)
      * Share your theme in our [showcase](https://github.com/ZenHelp/zen-help/discussions/13)!
 ---
-If you need help, you can always create an issue [here]() and we will get right with you!
+If you need help, you can always create an issue [here](https://github.com/ZenHelp/zen-help/issues/new) and we will get right with you!
