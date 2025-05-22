@@ -1,7 +1,7 @@
 name: Ticket Automation Bot
 on:
   issues:
-    types: [opened, closed, reopened]
+    types: [opened, closed, reopened, labeled, unlabeled, edited]
   discussion:
     types: [created]
 jobs:
@@ -33,19 +33,24 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add tickets/
+          git add tickets/ resolved/
           if [ "${{ github.event_name }}" == "issues" ]; then
             if [ "${{ github.event.action }}" == "closed" ]; then
-              git commit -m "Delete ticket folder for closed issue #${{ github.event.issue.number }}"
+              git commit -m "Move evaluation.md to resolved for closed issue #${{ github.event.issue.number }}"
+            elif [ "${{ github.event.action }}" == "reopened" ]; then
+              git commit -m "Move evaluation.md back to tickets for reopened issue #${{ github.event.issue.number }}"
+            elif [ "${{ github.event.action }}" == "labeled" ] || [ "${{ github.event.action }}" == "unlabeled" ] || [ "${{ github.event.action }}" == "edited" ]; then
+              git commit -m "Update evaluation.md for issue #${{ github.event.issue.number }}"
             else
               git commit -m "Create ticket folder and evaluation.md for issue #${{ github.event.issue.number }}"
             fi
           elif [ "${{ github.event_name }}" == "discussion" ]; then
-            git commit -m ":KOKCreate ticket folder and evaluation.md for discussion #${{ github.event.discussion.number }}"
+            git commit -m "Create ticket folder and evaluation.md for discussion #${{ github.event.discussion.number }}"
           fi
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
       - name: Notify Team
         if: github.event.action == 'opened' || github.event.action == 'created'
         env:
@@ -55,3 +60,4 @@ jobs:
           EVENT_TYPE: ${{ github.event_name }}
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.discussion.number }}
         run: node .github/scripts/notify-team.js
+        continue-on-error: true
