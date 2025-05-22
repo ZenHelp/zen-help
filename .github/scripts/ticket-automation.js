@@ -67,7 +67,7 @@ const path = require('path');
 
 **Labels**: ${labels}\\
 **Author**: [@${author}](https://github.com/${author})\\
-**Link**: ${html_url}\\
+**Link**: ${html_url}
       `;
       // Write evaluation.md file
       await fs.writeFile(path.join(ticketFolder, 'evaluation.md'), content.trim());
