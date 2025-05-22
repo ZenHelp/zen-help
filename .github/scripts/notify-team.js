@@ -5,6 +5,7 @@ const { Octokit } = require('@octokit/rest');
   const owner = process.env.REPO_OWNER;
   const repo = process.env.REPO_NAME;
   const eventType = process.env.EVENT_TYPE;
+  const eventAction = process.env.EVENT_ACTION;
   const number = process.env.ISSUE_NUMBER;
 
   try {
@@ -19,10 +20,14 @@ const { Octokit } = require('@octokit/rest');
         issue_number: number,
       });
       labels = data.labels.map(label => label.name);
-      commentBody = `New issue #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/${owner}/${repo}/tree/main/tickets/%23${number}/evaluation.md) file.`;
-    } else if (eventType === 'discussion') {
+      if (eventAction === 'opened') {
+        commentBody = `New issue #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/${owner}/${repo}/tree/main/tickets/%23${number}/evaluation.md) file.`;
+      } else if (eventAction === 'labeled' || eventAction === 'unlabeled') {
+        commentBody = `Labels updated on issue #${number}. Current labels: ${labels.join(', ') || 'None'}. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/${owner}/${repo}/tree/main/tickets/%23${number}/evaluation.md) file.`;
+      }
+    } else if (eventType === 'discussion' && eventAction === 'created') {
       const { data } = await octokit.graphql(`
-        query($owner: String!, $repo: String!, $number: Int!) {
+        query($owner: String!, $repo: String!, $number26: Int!) {
           repository(owner: $owner, name: $repo) {
             discussion(number: $number) {
               labels(first: 100) {
@@ -35,6 +40,9 @@ const { Octokit } = require('@octokit/rest');
         }`, { owner, repo, number: parseInt(number) });
       labels = data.repository.discussion.labels.nodes.map(label => label.name);
       commentBody = `New discussion #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/${owner}/${repo}/tree/main/tickets/%23${number}/evaluation.md) file.`;
+    } else {
+      console.log(`Event ${eventType}.${eventAction} not supported for notifications`);
+      return;
     }
 
     // Map labels to teams (customize as needed)
@@ -58,7 +66,9 @@ const { Octokit } = require('@octokit/rest');
     let teamsToNotify = new Set();
     labels.forEach(label => {
       if (labelToTeam[label]) {
-        labelToTeam[label].forEach(team => teamsToNotify.add(team));
+        labelToTeam[label].forEach(team => {
+          if (team) teamsToNotify.add(team);
+        });
       }
     });
 
@@ -68,8 +78,8 @@ const { Octokit } = require('@octokit/rest');
     }
 
     // Create comment with team mentions
-    const mentions = Array.from(teamsToNotify).map(team => `@${owner}/${team}`).join(', ');
-    const finalComment = `${mentions}. ${commentBody}`;
+    const mentions = Array.from(teamsToNotify).map(team => `@${owner}/${team}`).filter(Boolean).join(', ');
+    const finalComment = mentions ? `${mentions}. ${commentBody}` : commentBody;
 
     try {
       if (eventType === 'issues') {
