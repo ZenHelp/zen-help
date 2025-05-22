@@ -52,7 +52,7 @@ const path = require('path');
 
 **Labels**: ${details.labels || 'None'}\\
 **Author**: [@${details.author}](https://github.com/${details.author})\\
-**Link**: ${details.html_url}\\
+**Link**: ${details.html_url}
     `;
     await fs.writeFile(path.join(folderPath, 'evaluation.md'), content.trim());
     console.log(`Updated evaluation.md for #${number} in ${targetDir}`);
