@@ -36,9 +36,9 @@ jobs:
           git add tickets/ resolved/
           if [ "${{ github.event_name }}" == "issues" ]; then
             if [ "${{ github.event.action }}" == "closed" ]; then
-              git commit -m "Move evaluation.md to resolved for closed issue #${{ github.event.issue.number }}"
+              git commit -m "Move ticket folder to resolved for closed issue #${{ github.event.issue.number }}"
             elif [ "${{ github.event.action }}" == "reopened" ]; then
-              git commit -m "Move evaluation.md back to tickets for reopened issue #${{ github.event.issue.number }}"
+              git commit -m "Move ticket folder back to tickets for reopened issue #${{ github.event.issue.number }}"
             elif [ "${{ github.event.action }}" == "labeled" ] || [ "${{ github.event.action }}" == "unlabeled" ] || [ "${{ github.event.action }}" == "edited" ]; then
               git commit -m "Update evaluation.md for issue #${{ github.event.issue.number }}"
             else
@@ -52,12 +52,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
       - name: Notify Team
-        if: github.event.action == 'opened' || github.event.action == 'created'
+        if: github.event.action == 'opened' || github.event.action == 'created' || github.event.action == 'labeled' || github.event.action == 'unlabeled'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           EVENT_TYPE: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
           ISSUE_NUMBER: ${{ github.event.issue.number || github.event.discussion.number }}
         run: node .github/scripts/notify-team.js
         continue-on-error: true
