@@ -19,7 +19,7 @@ const { Octokit } = require('@octokit/rest');
         issue_number: number,
       });
       labels = data.labels.map(label => label.name);
-      commentBody = `New issue #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/ZenHelp/zen-help/tree/main/tickets/#${number}/evaluation.md) file.`;
+      commentBody = `New issue #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/ZenHelp/zen-help/tree/main/tickets/%23${number}/evaluation.md) file.`;
     } else if (eventType === 'discussion') {
       const { data } = await octokit.graphql(`
         query($owner: String!, $repo: String!, $number: Int!) {
@@ -34,7 +34,7 @@ const { Octokit } = require('@octokit/rest');
           }
         }`, { owner, repo, number: parseInt(number) });
       labels = data.repository.discussion.labels.nodes.map(label => label.name);
-      commentBody = `New discussion #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/ZenHelp/zen-help/tree/main/tickets/#${number}/evaluation.md) file.`;
+      commentBody = `New discussion #${number} created. Please review the details in the [tickets/#${number}/evaluation.md](https://github.com/ZenHelp/zen-help/tree/main/tickets/%23${number}/evaluation.md) file.`;
     }
 
     // Map labels to teams (customize this mapping as needed)
