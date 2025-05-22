@@ -27,7 +27,7 @@ const { Octokit } = require('@octokit/rest');
       }
     } else if (eventType === 'discussion' && eventAction === 'created') {
       const { data } = await octokit.graphql(`
-        query($owner: String!, $repo: String!, $number26: Int!) {
+        query($owner: String!, $repo: String!, $number: Int!) {
           repository(owner: $owner, name: $repo) {
             discussion(number: $number) {
               labels(first: 100) {
@@ -45,7 +45,7 @@ const { Octokit } = require('@octokit/rest');
       return;
     }
 
-    // Map labels to teams (customize as needed)
+    // Map labels to teams
     const labelToTeam = {
       'general': [''],
       'transparency': [''],
@@ -60,7 +60,6 @@ const { Octokit } = require('@octokit/rest');
       'Silkthemes': ['silkthemes'],
       'Zen': ['zen'],
       'needs-triage': ['triage-team'],
-      // Add more mappings as needed
     };
 
     let teamsToNotify = new Set();
@@ -72,7 +71,7 @@ const { Octokit } = require('@octokit/rest');
       }
     });
 
-    // If no teams are mapped, notify a default team
+    // Default team if no teams are mapped
     if (teamsToNotify.size === 0) {
       teamsToNotify.add('triage-team');
     }
@@ -81,6 +80,29 @@ const { Octokit } = require('@octokit/rest');
     const mentions = Array.from(teamsToNotify).map(team => `@${owner}/${team}`).filter(Boolean).join(', ');
     const finalComment = mentions ? `${mentions}. ${commentBody}` : commentBody;
 
+    // Check for recent comments to avoid duplicates
+    if (eventType === 'issues' && (eventAction === 'labeled' || eventAction === 'unlabeled')) {
+      const { data: comments } = await octokit.issues.listComments({
+        owner,
+        repo,
+        issue_number: number,
+        per_page: 10, // Check recent comments
+      });
+      const botUser = 'github-actions[bot]';
+      const recentThreshold = 60 * 1000; // 1 minute in milliseconds
+      const now = Date.now();
+      const recentComment = comments.find(comment => 
+        comment.user.login === botUser && 
+        comment.body.includes('Labels updated on issue') &&
+        new Date(comment.created_at).getTime() > now - recentThreshold
+      );
+      if (recentComment) {
+        console.log(`Skipping comment for issue #${number}: Recent comment found at ${recentComment.created_at}`);
+        return;
+      }
+    }
+
+    // Post the comment
     try {
       if (eventType === 'issues') {
         await octokit.issues.createComment({
