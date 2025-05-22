@@ -60,7 +60,7 @@ const path = require('path');
 ### ${title}
 
 **Labels**: ${labels}\\
-**Author**: ${author}\\
+**Author**: [@${author}](https://github.com/${author})\\
 **Link**: ${html_url}\\
     `;
 
