@@ -68,8 +68,8 @@ const { Octokit } = require('@octokit/rest');
     }
 
     // Create comment with team mentions
-    const mentions = Array.from(teamsToNotify).map(team => `@${owner}/${team}`).join(' ');
-    const finalComment = `${mentions} ${commentBody}`;
+    const mentions = Array.from(teamsToNotify).map(team => `@${owner}/${team}`).join(', ');
+    const finalComment = `${mentions}. ${commentBody}`;
 
     try {
       if (eventType === 'issues') {
