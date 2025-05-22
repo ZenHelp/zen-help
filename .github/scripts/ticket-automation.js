@@ -29,16 +29,15 @@ const path = require('path');
   const referenceFolder = path.join(referenceDir, folderName);
   const historyFolder = path.join(historyDir, folderName);
 
-  async function moveFile(src, destDir) {
+  async function moveFolder(src, dest) {
     try {
       await fs.access(src);
-      await fs.mkdir(destDir, { recursive: true });
-      const dest = path.join(destDir, 'evaluation.md');
+      await fs.mkdir(path.dirname(dest), { recursive: true });
       await fs.rename(src, dest);
-      console.log(`Moved evaluation.md from ${src} to ${dest}`);
+      console.log(`Moved folder from ${src} to ${dest}`);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        console.log(`Source file ${src} not found, skipping move.`);
+        console.log(`Source folder ${src} not found, skipping move.`);
       } else {
         throw error;
       }
@@ -53,7 +52,7 @@ const path = require('path');
 
 **Labels**: ${details.labels || 'None'}\\
 **Author**: [@${details.author}](https://github.com/${details.author})\\
-**Link**: ${details.html_url}
+**Link**: ${details.html_url}\\
     `;
     await fs.writeFile(path.join(folderPath, 'evaluation.md'), content.trim());
     console.log(`Updated evaluation.md for #${number} in ${targetDir}`);
@@ -88,26 +87,22 @@ const path = require('path');
       } else if (eventAction === 'edited' || eventAction === 'labeled' || eventAction === 'unlabeled') {
         details.labels = data.labels.map(label => label.name).join(', ') || 'None';
         // Only update if the folder exists in tickets/
-        if (await fs.access(path.join(ticketFolder, 'evaluation.md')).then(() => true).catch(() => false)) {
+        if (await fs.access(ticketFolder).then(() => true).catch(() => false)) {
           await updateEvaluationFile(number, details);
         }
       } else if (eventAction === 'closed') {
         const labels = data.labels.map(label => label.name);
         const targetDir = labels.includes(REFERENCE_LABEL) ? referenceFolder : historyFolder;
-        const src = path.join(ticketFolder, 'evaluation.md');
-        await moveFile(src, targetDir);
-        await fs.rm(ticketFolder, { recursive: true, force: true });
+        await moveFolder(ticketFolder, targetDir);
       } else if (eventAction === 'reopened') {
-        const possibleSrc1 = path.join(referenceFolder, 'evaluation.md');
-        const possibleSrc2 = path.join(historyFolder, 'evaluation.md');
+        const possibleSrc1 = referenceFolder;
+        const possibleSrc2 = historyFolder;
         if (await fs.access(possibleSrc1).then(() => true).catch(() => false)) {
-          await moveFile(possibleSrc1, ticketFolder);
-          await fs.rm(referenceFolder, { recursive: true, force: true });
+          await moveFolder(possibleSrc1, ticketFolder);
         } else if (await fs.access(possibleSrc2).then(() => true).catch(() => false)) {
-          await moveFile(possibleSrc2, ticketFolder);
-          await fs.rm(historyFolder, { recursive: true, force: true });
+          await moveFolder(possibleSrc2, ticketFolder);
         } else {
-          console.log(`No resolved evaluation.md found for #${number}, creating new ticket folder`);
+          console.log(`No resolved folder found for #${number}, creating new ticket folder`);
           await updateEvaluationFile(number, details);
         }
       }
