@@ -11,69 +11,80 @@ const path = require('path');
   const number = process.env.ISSUE_NUMBER;
 
   const REFERENCE_LABEL = 'reference';
+  const DEFAULT_LABEL = 'needs-triage';
   const ticketsDir = path.join(process.cwd(), 'tickets');
   const resolvedDir = path.join(process.cwd(), 'resolved');
   const referenceDir = path.join(resolvedDir, 'reference');
   const historyDir = path.join(resolvedDir, 'history');
 
-  // Create directories if they don't exist
-  await fs.mkdir(ticketsDir, { recursive: true });
-  await fs.mkdir(referenceDir, { recursive: true });
-  await fs.mkdir(historyDir, { recursive: true });
+  // Ensure directories exist
+  await Promise.all([
+    fs.mkdir(ticketsDir, { recursive: true }),
+    fs.mkdir(referenceDir, { recursive: true }),
+    fs.mkdir(historyDir, { recursive: true })
+  ]);
 
   const folderName = `#${number}`;
 
   async function moveFolder(src, dest) {
     try {
-      await fs.access(src, fs.constants.F_OK);
+      await fs.access(src);
       await fs.rename(src, dest);
       console.log(`Moved folder from ${src} to ${dest}`);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        console.log(`Source folder ${src} does not exist, skipping move.`);
+        console.log(`Source folder ${src} not found, skipping move.`);
       } else {
         throw error;
       }
     }
   }
 
-  async function createTicketFolder(number, details) {
+  async function updateEvaluationFile(number, details) {
     const folderPath = path.join(ticketsDir, `#${number}`);
-    await fs.rm(folderPath, { recursive: true, force: true });
-    await fs.mkdir(folderPath, { recursive: true });
     const content = `
 ### ${details.title}
 
-**Labels**: ${details.labels}\\
+**Labels**: ${details.labels || 'None'}\\
 **Author**: [@${details.author}](https://github.com/${details.author})\\
-**Link**: ${details.html_url}
+**Link**: ${details.html_url}\\
     `;
+    await fs.mkdir(folderPath, { recursive: true });
     await fs.writeFile(path.join(folderPath, 'evaluation.md'), content.trim());
+    console.log(`Updated evaluation.md for issue #${number}`);
   }
 
   try {
     if (eventType === 'issues') {
+      let { data } = await octokit.issues.get({ owner, repo, issue_number: number });
+      let details = {
+        title: data.title,
+        labels: data.labels.map(label => label.name).join(', ') || 'None',
+        author: data.user.login,
+        html_url: data.html_url
+      };
+
       if (eventAction === 'opened') {
-        const { data } = await octokit.issues.get({ owner, repo, issue_number: number });
         if (data.labels.length === 0) {
-          const defaultLabel = 'needs-triage';
           await octokit.issues.addLabels({
             owner,
             repo,
             issue_number: number,
-            labels: [defaultLabel]
+            labels: [DEFAULT_LABEL]
           });
-          console.log(`Added default label '${defaultLabel}' to issue #${number}`);
+          console.log(`Added default label '${DEFAULT_LABEL}' to issue #${number}`);
+          // Refetch issue data to include the new label
+          const updatedData = await octokit.issues.get({ owner, repo, issue_number: number });
+          data = updatedData.data;
+          details.labels = data.labels.map(label => label.name).join(', ') || 'None';
         }
-        const details = {
-          title: data.title,
-          labels: data.labels.map(label => label.name).join(', ') || 'None',
-          author: data.user.login,
-          html_url: data.html_url
-        };
-        await createTicketFolder(number, details);
+        const folderPath = path.join(ticketsDir, `#${number}`);
+        await fs.rm(folderPath, { recursive: true, force: true });
+        await updateEvaluationFile(number, details);
+      } else if (eventAction === 'edited' || eventAction === 'labeled' || eventAction === 'unlabeled') {
+        details.labels = data.labels.map(label => label.name).join(', ') || 'None';
+        await updateEvaluationFile(number, details);
       } else if (eventAction === 'closed') {
-        const { data } = await octokit.issues.get({ owner, repo, issue_number: number });
         const labels = data.labels.map(label => label.name);
         const targetDir = labels.includes(REFERENCE_LABEL) ? referenceDir : historyDir;
         const src = path.join(ticketsDir, folderName);
@@ -83,39 +94,15 @@ const path = require('path');
         const possibleSrc1 = path.join(referenceDir, folderName);
         const possibleSrc2 = path.join(historyDir, folderName);
         const dest = path.join(ticketsDir, folderName);
-        if (await fs.access(possibleSrc1, fs.constants.F_OK).then(() => true).catch(() => false)) {
+        if (await fs.access(possibleSrc1).then(() => true).catch(() => false)) {
           await moveFolder(possibleSrc1, dest);
-        } else if (await fs.access(possibleSrc2, fs.constants.F_OK).then(() => true).catch(() => false)) {
+        } else if (await fs.access(possibleSrc2).then(() => true).catch(() => false)) {
           await moveFolder(possibleSrc2, dest);
         } else {
-          console.log(`Ticket folder not found in resolved directories for #${number}`);
+          console.log(`No resolved folder found for #${number}, creating new ticket folder`);
+          await updateEvaluationFile(number, details);
         }
       }
-    } else if (eventType === 'discussion' && eventAction === 'created') {
-      const { data } = await octokit.graphql(`
-        query($owner: String!, $repo: String!, $number: Int!) {
-          repository(owner: $owner, name: $repo) {
-            discussion(number: $number) {
-              title
-              author {
-                login
-              }
-              url
-              labels(first: 100) {
-                nodes {
-                  name
-                }
-              }
-            }
-          }
-        }`, { owner, repo, number: parseInt(number) });
-      const details = {
-        title: data.repository.discussion.title,
-        labels: data.repository.discussion.labels.nodes.map(label => label.name).join(', ') || 'None',
-        author: data.repository.discussion.author.login,
-        html_url: data.repository.discussion.url
-      };
-      await createTicketFolder(number, details);
     }
   } catch (error) {
     console.error('Error:', error);
